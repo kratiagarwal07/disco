@@ -1,0 +1,72 @@
+from multiprocessing import Pool
+from glob import glob
+import numpy as np
+import cv2, os, sys
+
+pool = Pool(1)
+
+def multi_run_wrapper(args):
+   return run(*args)
+
+
+def match(category, filename):
+    train = cv2.imread(filename)
+    category = "files/images/" + category
+    arr = glob(category + '/*')
+    res = []
+    for file in arr:
+        if "(copy)" not in file:
+            res.append(file)
+
+    result_img = ""
+    result_score = 0
+
+    temp = []
+    for img in res:
+        temp1 = (img, train)
+        temp.append(temp1)
+
+    print temp
+
+    all_results = pool.map(multi_run_wrapper, temp)
+
+    '''
+    for img in res:
+        test = cv2.imread(img)
+        score = run(test, train)
+        if score > result_score:
+            result_img = img
+            result_score = score
+
+    return result_img, result_score
+    '''
+    return  "lol", 1.2
+
+
+
+def run(test, train):
+	# Detect the SIFT key points and compute the descriptors for the two images
+    	test = cv2.imread(test)
+    	sift = cv2.xfeatures2d.SIFT_create()
+	keyPoints1, descriptors1 = sift.detectAndCompute(train, None)
+	keyPoints2, descriptors2 = sift.detectAndCompute(test, None)
+
+	# Create brute-force matcher object
+	bf = cv2.BFMatcher()
+	matches = bf.knnMatch(descriptors1, descriptors2, k=2)
+
+	# Select the good matches using the ratio test
+	goodMatches = []
+
+	for m, n in matches:
+	    if m.distance < 0.9 * n.distance:
+			goodMatches.append(m)
+
+	result =  len(goodMatches)
+
+	return result
+
+def format(img):
+	temp = cv2.imread(img)
+	cv2.imwrite(img + ".jpg", temp)
+	os.remove(img)

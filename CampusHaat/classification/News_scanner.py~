@@ -1,0 +1,131 @@
+import urllib2, urllib, os, random, cookielib, time, sys, ssl, HTMLParser
+from bs4 import BeautifulSoup as Soup
+from selenium import webdriver
+from utils.googler import google_ocr
+from utils.search import google_search
+import cv2, math, os
+from scipy.ndimage import rotate
+import numpy as np
+from Canteen import run
+
+# list to find useful section
+parse_list = ['story-details', 'story-section', 'story-content', 'article-body section', 'article-section', 'article-full-content' ]
+
+# Making utf-8 default encoding
+reload(sys)
+sys.setdefaultencoding("utf-8")
+
+# Avoiding SSL problems
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+# creating headers
+headers = {'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0', 'Connection': 'keep-alive',}
+
+# creating build_opener
+cj = cookielib.CookieJar()
+opener = urllib2.build_opener(urllib2.HTTPSHandler(context=ctx), urllib2.HTTPCookieProcessor(cj))
+opener.addheaders = [headers]
+
+# loading selenium build_opener
+for key in headers:
+    webdriver.DesiredCapabilities.PHANTOMJS['phantomjs.page.customHeaders.{}'.format(key)] = headers[key]
+browser = webdriver.PhantomJS()
+
+# fetch news from google
+def google_links(page):
+    res = []
+    browser.get(page)
+    time.sleep(2)
+    Page_Html = browser.page_source
+
+    with open("temp.html", 'w') as file:
+        file.write(Page_Html)
+
+    Parsed_html = Soup(Page_Html, "html.parser")
+    Container = Parsed_html.findAll("div", {"id":"rso"})[0]
+    rows = Container.findAll("div", {"class":"g"})
+
+    for row in rows:
+	try:
+	    link = row.findAll("a")[0]['href']
+	    original = link
+	    link = link.replace("%3A", ":")
+	    link = link.replace("%2F", "/")
+	    link = link.replace("%2520", "%20")
+	    res.append(link)
+	except:
+	    print "Found something not captured"
+
+    return res
+
+
+def download(name, arr, num):
+	count = 0
+	for doc in arr:
+	    link = doc
+	    filename = link.split("://")[1].split("/")[0]
+	    news_agency = filename
+	    filename = "News_temp/" +filename + "_" + str(random.randint(1,9999)) + ".html"
+	    try:
+		test = opener.open(link, timeout=5)
+		Page_Html = test.read()
+		Parsed_html = Soup(Page_Html, "html.parser")
+		title = Parsed_html.findAll("h1")[0].text
+		for elem in parse_list:
+
+		    try:
+			Container = Parsed_html.findAll("div", {"class":elem})[0]
+			print "Sucessfull now"
+			Page_Html = Container
+			with open(filename, 'w') as wr:
+				wr.write("Original_link: " + link +  "\nTitle: " + title + " \n\n" + str(Page_Html))
+           		count += 1
+			break
+
+		    except:
+			continue
+
+	    except:
+		    print link
+
+	    if count > num:
+		break
+
+
+imagepath = sys.argv[1]
+# reaizing image
+'''
+image = cv2.imread(imagepath)
+h, w, _ = image.shape
+w = 500.0/w
+h = 700.0/h
+temp = min(w,h)
+temp = cv2.resize(image, (0,0), fx=temp, fy=temp)
+cv2.imwrite(imagepath, temp)
+'''
+
+items, main_dis = run(imagepath)
+
+title = "Nothing"
+print items
+for dummy in items:
+    if dummy["title"] != 'Menu':
+        title = dummy["title"]
+        print title
+        break
+
+if title == "Nothing":
+    seed = main_dis[:60]
+else:
+    try:
+        seed = title + main_dis.split(title)[1][:20]
+    except:
+        seed = main_dis[:60]
+
+print seed
+num = 1
+result = google_search(seed)
+download(seed, result, num)
+os.remove("ghostdriver.log")
