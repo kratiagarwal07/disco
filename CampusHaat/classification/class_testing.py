@@ -100,25 +100,30 @@ def textDetection(conn, conn1, imagepath):
 
 # trying to run in parallel, two pipes for getting intermediate result
 def class_run(imagepath, model, label):
-    time1 = time.time()
-    if "http" in imagepath:
-	    imagepath = download(imagepath)
-	    format(imagepath)
-	    imagepath += ".jpg"
-    parent_conn, child_conn = Pipe()
-    parent_conn1, child_conn1 = Pipe()
-    parent_conn2, child_conn2 = Pipe()
-    p = Process(target=classification, args=(child_conn, model, label, imagepath))
-    p1 = Process(target=textDetection, args=(child_conn2, parent_conn, imagepath))
-    p.start()
-    p1.start()
-    result = parent_conn2.recv()
-    text_res =  result[0]
-    result =  result[1]
-    p.join()
-    p1.join()
-    img_res =  imgMatch(result, imagepath)
-    if "prod_id" not in text_res:
-    	text_res.update(img_res)
-    text_res.update({"prod_title" : query_final(text_res["prod_id"])[1], "categoryId":mapped_doc[text_res["category"]]})
-    return text_res
+	try:
+		time1 = time.time()
+		if "http" in imagepath:
+		    imagepath = download(imagepath)
+		    format(imagepath)
+		    imagepath += ".jpg"
+		parent_conn, child_conn = Pipe()
+		parent_conn1, child_conn1 = Pipe()
+		parent_conn2, child_conn2 = Pipe()
+		p = Process(target=classification, args=(child_conn, model, label, imagepath))
+		p1 = Process(target=textDetection, args=(child_conn2, parent_conn, imagepath))
+		p.start()
+		p1.start()
+		result = parent_conn2.recv()
+		text_res =  result[0]
+		result =  result[1]
+		p.join()
+		p1.join()
+		img_res =  imgMatch(result, imagepath)
+		if "prod_id" not in text_res:
+			text_res.update(img_res)
+		text_res.update({"prod_title" : query_final(text_res["prod_id"])[1], "categoryId":mapped_doc[text_res["category"]]})
+		base_response = {"BaseResponse":{"status_code":200, "message":"SuccessFul"}, "productlists": [{"Category":{"categoryId":mapped_doc[text_res["category"]], "Category":text_res["category"]}, "Product":{"product_id":text_res["prod_id"], "product_title":text_res["prod_title"]}}]}
+		return base_response
+	except:
+		base_response = 
+		base_response = {"BaseResponse":{"status_code":500, "message":"System error..."}, "productlists": [{"Category":{"categoryId":mapped_doc[text_res["category"]], "Category":text_res["category"]}, "Product":{"product_id":text_res["prod_id"], "product_title":text_res["prod_title"]}}]}
