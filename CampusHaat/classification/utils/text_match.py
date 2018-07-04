@@ -74,6 +74,15 @@ def textMatch(num, text):
     conn.close()
     return result_score, result_title, result_id
 
+def query_final(prod_id):
+    conn = MySQLdb.connect(host="35.154.159.250", port=3306, user="admin", passwd="9251640269Guddu", db="campushaat_prod")
+    c = conn.cursor()
+    cmd = "select AdsCreatedBy, AdsTitle from ads where AdsId={0}".format(prod_id)
+
+    test = c.execute(cmd)
+    row = c.fetchone()
+    conn.close()
+    return row
 
 if __name__ == "__main__":
 	result_score, result_title, result_id = textMatch(3, 'thomas')

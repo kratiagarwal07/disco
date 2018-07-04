@@ -1,19 +1,23 @@
 import os, subprocess, time, sys, re, cv2
 from label_image import classify
 from img_match import match, run, format
-from text_match import textMatch
+from text_match import textMatch, query_final
 from img_download import download
 from ocr_reader import google_ocr
 from multiprocessing import Process, Pipe, Pool
 from glob import glob
 from flask import jsonify
+from capr import Category as k_cat
 
 ocr_category = ["book"]
 subcategory = ["cycle"]
 
+mapped_doc = {"book":3, "bike":16}
+
+
 def imgMatch(category, filename):
     train = cv2.imread(filename)
-    category = "/home/intel/FlaskApp/CampusHaat/classification/files/images/" + category
+    category = "/home/ubuntu/FlaskApp/CampusHaat/classification/files/images/" + category
     arr = glob(category + '/*')
     print arr, category
     result = []
@@ -60,7 +64,7 @@ def imgMatch(category, filename):
 	prog7.join()
 
     result = sorted(result, key = lambda x : x['Result'], reverse=True)
-    temp = {"Image_res": result[0]["Img"],"Image_score": result[0]["Result"]/1000.0}
+    temp = { "prod_id": int(result[0]["Img"].split("/")[-1])}
     return temp
 
 
@@ -79,12 +83,17 @@ def textDetection(conn, conn1, imagepath):
 	text = google_ocr(imagepath).lower()
 	result = conn1.recv()
 	if text == "no":
-		conn.send([{}, result])
+		conn.send([{"category":result }, result])
 		conn.close()
 	else:
 		text = re.sub(r'\W+', ' ', text)
 		score, title,result_id= textMatch(3, text)
-		temp = {"Item_class":result ,"Ocr_text":text, "Ocr_title":title, "Ocr_score" : score, "prod_id":result_id}
+		#product=Product.Product()
+
+		#product.setProductTitle(title)
+		#product.setProductId(result_id)
+		
+		temp = {"category":result , "prod_id":result_id}
 		temp = [temp, result]
 		conn.send(temp)
 		conn.close()
@@ -109,5 +118,7 @@ def class_run(imagepath, model, label):
     p.join()
     p1.join()
     img_res =  imgMatch(result, imagepath)
-    text_res.update(img_res)
+    if "prod_id" not in text_res:
+    	text_res.update(img_res)
+    text_res.update({"prod_title" : query_final(text_res["prod_id"])[1], "categoryId":mapped_doc[text_res["category"]]})
     return text_res
